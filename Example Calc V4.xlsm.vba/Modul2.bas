@@ -7,6 +7,7 @@ Const Wrong_No As String = "~999999"
 Const Zellen_Verbinden As Boolean = True
 Const Text_y As Integer = 3
 Const Anz_Link_Fields As Integer = 2          ' Linkfelder für die Zufallsgenerierung im Tabellenblatt Rnd_Matrix
+Const hsrw_ID As Boolean = False              ' set true, if you are teacher at hsrw (Student ID will be extracted from username in this case)
 Sub test()
 Dim exp_string As String
     exp_string = export_plain_html(1)
@@ -613,10 +614,12 @@ Dim no_responses As Integer
         question_no = "Response " + (InputBox("Question number?"))
         x = 5
         Cells(4, 3).Value = "ID"
-        While Cells(x, 1).Value <> ""
-            Cells(x, 3).Value = Left(Cells(x, 3).Value, 5)
-            x = x + 1
-        Wend
+        If hsrw_ID Then
+            While Cells(x, 1).Value <> ""
+                Cells(x, 3).Value = Left(Cells(x, 3).Value, 5)
+                x = x + 1
+            Wend
+        End If
         y = 7
         While Cells(4, y).Value <> ""
             While (Cells(4, y).Value <> "") And (Cells(4, y).Value <> question_no)
