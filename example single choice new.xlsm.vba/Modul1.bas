@@ -1,7 +1,6 @@
 Option Explicit
 Const Text_y As Integer = 5
 Const Start_x As Integer = 6
-Const start_MCS_x As Integer = 13
 Const Question_type As String = "<!--xx SC xx -->"
 Const Anz_Link_Fields As Integer = 2          ' Linkfelder für die Zufallsgenerierung im Tabellenblatt Rnd_Matrix
 Function export_plain_html(ByVal Ziehen As Integer) As String
@@ -181,12 +180,13 @@ Dim Extra As Integer
 End Function
 
 
-Private Sub init(ByVal Ziehen_Typ As Integer, ByRef gez_wahr As Variant, ByRef gez_falsch As Variant, ByRef gezogen0 As Variant, ByRef quest_anz As Variant, _
+Private Sub init(ByVal Ziehen_Typ As Integer, ByRef gez_wahr As Variant, ByRef gez_falsch As Variant, ByRef gezogen As Variant, ByRef gezogen0 As Variant, ByRef quest_anz As Variant, _
             ByRef quest_wahr As Variant, ByRef quest_falsch As Variant, ByRef valid_questions As Variant)
 Dim x As Integer
 Dim i As Integer
 Dim val_q As Integer
-Dim no_q As Integer
+Dim no_q As Integer     ' Anzahl statements pro Frage (ohne Last always)
+Dim no_clz As Integer   ' anzahl der Cloze Fragen (mit jeweils mehreren SC Frage)
 Dim zusatz As Integer
     x = Start_x
     If Ziehen_Typ = 2 Then
@@ -205,6 +205,7 @@ Dim zusatz As Integer
     quest_falsch = gez_wahr
     valid_questions = gez_wahr
     quest_anz = gez_wahr
+    gezogen = gez_wahr
     i = 0
     x = Start_x
     With Worksheets("questions")
@@ -230,17 +231,32 @@ Dim zusatz As Integer
     End If
     no_q = Worksheets("Gen_output").Cells(17, 2).Value - zusatz
     val_q = 0
-    For i = 1 To quest_anz(0)
+    For i = 1 To quest_anz(0)           ' Voraussetzungen abklappern, dass Frage möglich ist
         If (quest_wahr(i) + quest_falsch(i)) >= no_q Then
             If Not ((zusatz = 0) And ((quest_wahr(i) = 0) Or (quest_falsch(i) = 0))) Then
                 If (((quest_wahr(i) + 1) >= no_q) Or ((quest_falsch(i) + 1) >= no_q)) Then
-                    val_q = val_q + 1
-                    valid_questions(val_q) = i
+                    If Not (Worksheets("Gen_output").Cells(21, 2).Value And ((quest_wahr(i) = 0) Or (quest_falsch(i) + 1 < no_q))) Then
+                        val_q = val_q + 1
+                        valid_questions(val_q) = i
+                    End If
                 End If
             End If
         End If
     Next i
     valid_questions(0) = val_q
+    If val_q = 0 Then
+        Exit Sub
+    End If
+    no_clz = Worksheets("Gen_output").Cells(16, 2).Value
+    For i = 1 To valid_questions(0)
+        If Worksheets("Gen_output").Cells(21, 2).Value Then
+            gez_wahr(valid_questions(i)) = no_clz
+        Else
+            gez_wahr(valid_questions(i)) = Round(no_clz * (quest_falsch(valid_questions(i)) / (quest_wahr(valid_questions(i)) + quest_falsch(valid_questions(i)))), 0)
+            gez_falsch(valid_questions(i)) = no_clz - gez_wahr(valid_questions(i))
+        End If
+    Next i
+        
 End Sub
 
 Sub Export_Moodle_XLM()
@@ -251,12 +267,13 @@ Dim Question_String As String
 Dim Single_Question As String
 Dim max_substitute As Integer
 Dim substitute As Integer
-Dim gez_wahr, gez_falsch, gezogen0, quest_anz, quest_wahr, quest_falsch, valid_quest As Variant
+Dim gez_wahr, gez_falsch, gezogen0, quest_anz, quest_wahr, quest_falsch, valid_quest, gezogen As Variant
 Dim i As Integer
+Dim n As Integer
 Dim No_Bonus_comment As Boolean
 
     Randomize
-    Call init(2, gez_wahr, gez_falsch, gezogen0, quest_anz, quest_wahr, quest_falsch, valid_quest)
+    Call init(2, gez_wahr, gez_falsch, gezogen, gezogen0, quest_anz, quest_wahr, quest_falsch, valid_quest)
     If valid_quest(0) = 0 Then
         MsgBox ("No valid questions can be generated. Please check number of positive and negative responses and your requested number of statemtens per question.")
         Exit Sub
@@ -265,18 +282,20 @@ Dim No_Bonus_comment As Boolean
         max_substitute = .Cells(14, 2).Value
         Filepath = .Cells(4, 2).Value + .Cells(5, 2).Value
     End With
-'    Text_File = FreeFile
-'    Open Filepath For Output As Text_File
-'    Call Print_Replace(Text_File, max_substitute, vbLf + "<quiz>" + vbLf)
-'    For i = 1 To Worksheets("Gen_output").Cells(16, 2).Value
-'        substitute = Int(Rnd() * (max_substitute)) + 1
-'        Call select_questions(gezogen, gezogen0, gez_prozent)
-'        Single_Question = Code_Generieren(gezogen, gez_prozent)
-'        Question_String = XML_Header(i) + Single_Question + XML_End(i)
-'        Call Print_Replace(Text_File, substitute, Question_String)
-'    Next i
-'    Call Print_Replace(Text_File, substitute, vbLf + "</quiz>")
-'    Close Text_File
+    Text_File = FreeFile
+    Open Filepath For Output As Text_File
+    Call Print_Replace(Text_File, max_substitute, vbLf + "<quiz>" + vbLf)
+    For i = 1 To valid_quest(0)
+        substitute = Int(Rnd() * (max_substitute)) + 1
+        For n = 1 To quest_anz(0)               ' schleife passt, in der schleife muss noch alles geändert werden.
+'            Call select_questions(gezogen, gezogen0, gez_prozent)
+'            Single_Question = Code_Generieren(gezogen, gez_prozent)
+'            Question_String = XML_Header(i) + Single_Question + XML_End(i)
+'            Call Print_Replace(Text_File, substitute, Question_String)
+        Next n
+    Next i
+    Call Print_Replace(Text_File, substitute, vbLf + "</quiz>")
+    Close Text_File
 End Sub
 Private Function XML_Header(number As Integer) As String
     XML_Header = vbLf + "<question type=""cloze"">" + vbLf + "<name><text>" + _
