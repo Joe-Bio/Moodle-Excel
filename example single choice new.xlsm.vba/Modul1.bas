@@ -19,174 +19,189 @@ Dim bonus_comment As Boolean
     Call Prozente_Anpassen(gez_prozent)
     export_plain_html = Question_type + Code_Generieren(gezogen, gez_prozent) + extra_Generieren(gezogen, True)
 End Function
-Private Sub select_questions(ByRef gezogen As Variant, ByVal gezogen0 As Variant, ByRef prozent As Variant)
-Dim Category As Integer
-Dim Anz_category As Variant
-Dim i As Variant
-Dim x As Variant
-Dim alles_falsch As Integer
-Dim invalid_count As Integer
-Dim valid As Boolean
-    valid = False
+Private Sub select_questions(ByRef gezogen As Variant, ByVal gezogen0 As Variant, ByRef gez_wahr As Variant, _
+        ByRef gez_falsch As Variant, ByVal pos_quest As Variant, ByVal category As Integer)
+' im Prinzip fertig, muss noch getestet werden!!!!!
+Dim Wahre_Version As Boolean
+Dim extra As Boolean
+Dim extra_value As Variant
+Dim y_multiple As Integer
+Dim remain As Integer
+Dim q_anz As Integer
+Dim Ende As Integer
+Dim x As Integer
     gezogen = gezogen0
-    Anz_category = Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-    alles_falsch = 1
-    invalid_count = 0
-    While Not (valid)
-        For i = 1 To 9
-            Anz_category(i) = Worksheets("Gen_output").Cells(19, i + 1).Value
-        Next i
-        x = Start_x
-        While Worksheets("questions").Cells(x, Text_y).Value <> ""
-            Worksheets("questions").Cells(x, 1).Value = ""
-            x = x + 1
-        Wend
-        For Category = 1 To 5
-            While Anz_category(Category) > 0
-                Call Draw_Text(Category)
-                Anz_category(Category) = Anz_category(Category) - 1
-            Wend
-        Next Category
-        valid = Validity_Check()
-        If Not (valid) Then
-            invalid_count = invalid_count + 1
-            If invalid_count > 20 Then
-                MsgBox ("Too many wrong questions, question generation not possible. Try to increase number of correct questions or include last always - none of others is correct.")
-                Exit Sub
-            End If
-        End If
+    x = pos_quest(category) + 1
+    extra_value = Worksheets("Gen_output").Cells(20, 2).Value
+    extra = (extra_value > 0)
+    q_anz = Worksheets("Gen_output").Cells(17, 2).Value
+    ' draw correct or wrong version
+    Wahre_Version = (gez_wahr(category) >= (Rnd * (gez_wahr(category) + gez_falsch(category))))
+    If Wahre_Version Then
+        gez_wahr(category) = gez_wahr(category) - 1
+        y_multiple = 5
+    Else
+        gez_falsch(category) = gez_falsch(category) - 1
+        y_multiple = 6
+    End If
+    
+    ' "korrekte" antwort ziehen
+    gezogen(0) = 0
+    If extra Then
+        Ende = 1
+    Else
+        Ende = 0
+    End If
+    q_anz = q_anz - 1
+    If (Rnd < extra_value) Then     ' extra antwort als richtig
+        gezogen(1) = 1000
+        gezogen(0) = 1
+        extra = False
+        Ende = 0
+    Else                                                ' Antwort ziehen
+        Call Draw_Text(gezogen, y_multiple + Round((5.5 - y_multiple) * 2, 0), category, x)
+    End If
+    
+    While q_anz > Ende
+        Call Draw_Text(gezogen, y_multiple, category, x)        ' falsche ziehen
+        q_anz = q_anz - 1
     Wend
-    x = Start_x
-    i = 0
-    While Worksheets("questions").Cells(x, Text_y).Value <> ""
-        If Worksheets("questions").Cells(x, 1).Value = "x" Then
-            i = i + 1
-            If Worksheets("questions").Cells(x, 3).Value = Worksheets("Gen_output").Cells(25, 2).Value Then
-                gezogen(0) = x
-                prozent(0) = Worksheets("questions").Cells(x, 4).Value
-                i = i - 1
-            Else
-                gezogen(i) = x
-                prozent(i) = Worksheets("questions").Cells(x, 4).Value
-            End If
-            If prozent(i) = 1 Then
-                alles_falsch = -1
-            End If
-            Worksheets("questions").Cells(x, 2).Value = Worksheets("questions").Cells(x, 2).Value + 1
-        End If
-        x = x + 1
-    Wend
-    If Worksheets("Gen_output").Cells(23, 2).Value = 1 Then
-        i = i + 1
-        gezogen(i) = x
-        prozent(i) = alles_falsch
+    If extra Then          ' letzte hinzufügen
+        gezogen(0) = gezogen(0) + 1
+        gezogen(gezogen(0)) = 1000
+    End If
+    If Wahre_Version Then
+        gezogen(0) = gezogen(0) * (-1)
     End If
 End Sub
 
-Private Sub Draw_Text(ByVal Category As Integer)
+Private Sub Draw_Text(ByRef gezogen As Variant, ByVal y_current As Integer, ByVal q_no As Integer, ByVal start_cat_x As Integer)
+
+Dim category As Integer
 Dim x As Integer
-Dim i As Integer
 Dim selected As Boolean
 Dim Min As Integer
+Dim i As Integer
 Dim numb_count As Integer
-    x = Start_x
-    Call Anzahl_cat(numb_count, Min, Category)
+    x = start_cat_x
+    category = Worksheets("questions").Cells(x, 3).Value
+    Call Anzahl_cat(numb_count, Min, start_cat_x, y_current, category)
     i = Int(Rnd * numb_count)
     selected = False
-    While Not (selected)
-        If (Worksheets("questions").Cells(x, 1).Value <> "x") And (Worksheets("questions").Cells(x, 2).Value = Min) And (Worksheets("questions").Cells(x, 3).Value = Category) Then
-            If i = 0 Then
-                selected = True
-                Worksheets("questions").Cells(x, 1).Value = "x"
-            Else
-                i = i - 1
+    With Worksheets("questions")
+        While Not (selected)
+            If (.Cells(x, 1).Value <> "x") And (.Cells(x, 2).Value = Min) And (.Cells(x, 3).Value = category) And (.Cells(x, y_current).Value <> "") Then
+                If i = 0 Then
+                    selected = True
+                    .Cells(x, 1).Value = "x"
+                    .Cells(x, 2).Value = .Cells(x, 2).Value + 1
+                    gezogen(0) = gezogen(0) + 1
+                    gezogen(gezogen(0)) = x
+                Else
+                    i = i - 1
+                End If
             End If
-        End If
-        x = x + 1
-    Wend
+            x = x + 1
+        Wend
+    End With
 End Sub
-Private Sub Anzahl_cat(ByRef Anzahl As Integer, ByRef Min As Integer, ByVal Category As Integer)
+Private Sub Anzahl_cat(ByRef Anzahl As Integer, ByRef Min As Integer, ByVal start_cat_x As Integer, _
+        ByVal Current_y As Integer, ByVal category As Integer)
 Dim x As Integer
     Anzahl = 0
     Min = 100
-    x = Start_x
-    While Worksheets("questions").Cells(x, Text_y).Value <> ""
-        If (Worksheets("questions").Cells(x, 3).Value = Category) And (Worksheets("questions").Cells(x, 1).Value <> "x") And (Min > Worksheets("questions").Cells(x, 2).Value) Then
-            Min = Worksheets("questions").Cells(x, 2).Value
-        End If
-        x = x + 1
-    Wend
-    x = Start_x
-    While Worksheets("questions").Cells(x, Text_y).Value <> ""
-        If (Worksheets("questions").Cells(x, 3).Value = Category) And (Worksheets("questions").Cells(x, 1).Value <> "x") And (Min = Worksheets("questions").Cells(x, 2).Value) Then
-            Anzahl = Anzahl + 1
-        End If
-        x = x + 1
-    Wend
-End Sub
-Private Function Validity_Check() As Boolean
-Dim x As Integer
-Dim i As Variant
-Dim proz As Variant
-    If Worksheets("Gen_output").Cells(23, 2).Value = 1 Then
-        Validity_Check = True
-    Else
-        x = Start_x
-        i = 0
-        proz = 0
-        While Worksheets("questions").Cells(x, Text_y).Value <> ""
-            If Worksheets("questions").Cells(x, 1).Value = "x" Then
-                i = i + 1
-                proz = proz + Worksheets("questions").Cells(x, 4).Value
+    x = start_cat_x
+    With Worksheets("questions")
+        While (.Cells(x, 3).Value = category)
+            If (.Cells(x, 1).Value <> "x") And (.Cells(x, Current_y).Value <> "") And (Min > .Cells(x, 2).Value) Then
+                Min = .Cells(x, 2).Value
             End If
             x = x + 1
         Wend
-        Validity_Check = (i <> Abs(proz))
-    End If
-End Function
-
-Private Function Code_Generieren(ByVal gezogen As Variant, ByVal gez_prozent As Variant) As String
-Dim i, Anzahl, letzte_Immer As Integer
-Dim prozente As String
-Dim Extra As Integer
-    Code_Generieren = "<p>" + Worksheets("questions").Cells(3, 3).Value + "</p>" + vbLf + "<p>"
-    Code_Generieren = Code_Generieren + "{" + Trim(Str(Worksheets("Gen_output").Cells(22, 2).Value)) + ":" + Worksheets("Gen_output").Cells(21, 2).Value + ":"
-    Anzahl = Worksheets("Gen_output").Cells(17, 2).Value
-    letzte_Immer = Worksheets("Gen_output").Cells(23, 2).Value
-    If Worksheets("Gen_output").Cells(25, 2).Value > 0 Then
-        Extra = 1
-    Else
-        Extra = 0
-    End If
-    For i = 1 To Anzahl - Extra
-        prozente = "%" + Trim(Str(Round(gez_prozent(i) * 100, 0))) + "%"
-        If (i <= Anzahl - letzte_Immer - Extra) Then
-            Code_Generieren = Code_Generieren + prozente + " " + Worksheets("questions").Cells(gezogen(i), 5).Value
-        Else
-            If letzte_Immer = 1 Then
-                Code_Generieren = Code_Generieren + prozente + " " + Worksheets("Gen_output").Cells(23, 4).Value
+        x = start_cat_x
+        While (.Cells(x, 3).Value = category)
+            If (.Cells(x, 1).Value <> "x") And (Min = .Cells(x, 2).Value) And (.Cells(x, Current_y).Value <> "") Then
+                Anzahl = Anzahl + 1
             End If
-        End If
-        If (Worksheets("questions").Cells(gezogen(i), Text_y + 1).Value <> "") And (Worksheets("Gen_output").Cells(12, 2).Value) Then
-            Code_Generieren = Code_Generieren + "#" + Worksheets("questions").Cells(gezogen(i), 6).Value
-        End If
-                
-        If i < Anzahl - Extra Then
+            x = x + 1
+        Wend
+    End With
+End Sub
+
+Private Function Code_Generieren(ByVal gezogen As Variant, ByVal x_pos As Integer) As String
+Dim i, Anzahl, letzte_Immer As Integer
+Dim typ As String
+Dim bold_start, bold_end As String
+Dim y As Integer
+Dim points As String
+Dim extra As Integer
+Dim include_comment As Boolean
+Dim last_chosen As String
+Dim comment As String
+    typ = Trim(Worksheets("questions").Cells(x_pos, 4).Value)
+    If typ = "" Then
+        typ = "MCVS"
+    End If
+    include_comment = Worksheets("Gen_output").Cells(12, 2).Value
+    If gezogen(0) < 0 Then
+        y = 6
+    Else
+        y = 5
+    End If
+    If Worksheets("Gen_output").Cells(13, 2) Then
+        bold_start = "<b>"
+        bold_end = "</b>"
+    Else
+        bold_start = ""
+        bold_end = ""
+    End If
+    last_chosen = Worksheets("Gen_output").Cells(20, y - 1).Value
+    points = ""
+    If Val(typ) = 0 Then
+        points = Trim(Str(Worksheets("Gen_output").Cells(19, 2).Value)) + ":"
+    End If
+    Code_Generieren = "<p>" + bold_start + Worksheets("questions").Cells(x_pos, y).Value + bold_end + "</p>" + vbLf + "<p>"
+    Code_Generieren = Code_Generieren + "{" + points + typ + ":"
+    For i = 1 To Abs(gezogen(0))
+        If i = 1 Then
+            Code_Generieren = Code_Generieren + "="
+        Else
             Code_Generieren = Code_Generieren + " ~"
+        End If
+        If gezogen(i) <> 1000 Then
+            Code_Generieren = Code_Generieren + Worksheets("questions").Cells(gezogen(i), y).Value
+            If include_comment And Worksheets("questions").Cells(gezogen(i), 7).Value <> "" Then
+                Code_Generieren = Code_Generieren + "#" + Worksheets("questions").Cells(gezogen(i), 7).Value
+            End If
+        Else
+            Code_Generieren = Code_Generieren + last_chosen
+        End If
+        If i = 1 Then
+            y = y + (5.5 - y) * 2
         End If
     Next i
     
-    Code_Generieren = Code_Generieren + "}</p>"
+    Code_Generieren = Code_Generieren + "}</p>" + vbLf
 End Function
 
 
-Private Sub init(ByVal Ziehen_Typ As Integer, ByRef gez_wahr As Variant, ByRef gez_falsch As Variant, ByRef gezogen As Variant, ByRef gezogen0 As Variant, ByRef quest_anz As Variant, _
-            ByRef quest_wahr As Variant, ByRef quest_falsch As Variant, ByRef valid_questions As Variant)
+Private Sub init(ByVal Ziehen_Typ As Integer, ByRef gez_wahr As Variant, ByRef gez_falsch As Variant, ByRef gezogen As Variant, ByRef gezogen0 As Variant, _
+            ByRef stat_wahr As Variant, ByRef stat_falsch As Variant, ByRef pos_quest As Variant, ByRef valid_questions As Variant)
+' Logik gez_wahr, gez_falsch:
+' wird "Wahre Antwort" gezogen, so ist ein Statment richtig, und die restlichen falsch.
+' damit das also erfüllbar ist muss es mindestens ein Wahres statement geben und mindestens no_q - 1 falsche statements.
+' gibt es mehr falsche als wahre statements, so sollte öfters eine WAhre Antwort gezogen werden als eine falsche, um die
+' Möglichkeiten optimal auszunutzen. gez_wahr ist dann also größer als gez_falsch - und das ist genau umgekehrt als die anzahl der Statements (die in
+' stat_wahr und stat_falsch abgelegt sind.
+' für valide Antworten muss noch beachtet werden, dass ein Statement auch falsch und richtig enthalten kann - dann erhöht sich die Anzahl der notwendigen statements entsprechend.
 Dim x As Integer
 Dim i As Integer
 Dim val_q As Integer
-Dim no_q As Integer     ' Anzahl statements pro Frage (ohne Last always)
+Dim no_q As Integer     ' Anzahl statements pro Frage (abzüglich 1 - entspricht also der Anzahl der gliechartigen Statements, die eine Frage aufweisen muss)
 Dim no_clz As Integer   ' anzahl der Cloze Fragen (mit jeweils mehreren SC Frage)
+Dim q_add As Integer
+Dim quest_anz As Variant
+Dim last_always As Boolean
 Dim zusatz As Integer
     x = Start_x
     If Ziehen_Typ = 2 Then
@@ -201,41 +216,43 @@ Dim zusatz As Integer
     gez_wahr = Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
     gez_falsch = gez_wahr
     gezogen0 = gez_wahr
-    quest_wahr = gez_wahr
-    quest_falsch = gez_wahr
+    stat_wahr = gez_wahr
+    stat_falsch = gez_wahr
     valid_questions = gez_wahr
-    quest_anz = gez_wahr
     gezogen = gez_wahr
+    pos_quest = gez_wahr
+    quest_anz = gez_wahr
     i = 0
     x = Start_x
+    q_add = 1
     With Worksheets("questions")
         While .Cells(x, 3).Value <> ""
             If .Cells(x, 3).Value > i Then
                 i = i + 1
+                pos_quest(i) = x
                 x = x + 1
             End If
             If .Cells(x, 5).Value <> "" Then
-                quest_wahr(i) = quest_wahr(i) + 1
+                stat_wahr(i) = stat_wahr(i) + 1
             End If
             If .Cells(x, 6).Value <> "" Then
-                quest_falsch(i) = quest_falsch(i) + 1
+                stat_falsch(i) = stat_falsch(i) + 1
+                If .Cells(x, 5).Value <> "" Then
+                    q_add = 2
+                End If
             End If
-            quest_anz(i) = quest_anz(i) + 1
             x = x + 1
         Wend
     End With
     quest_anz(0) = i
-    zusatz = 0
-    If Worksheets("Gen_output").Cells(20, 2).Value > 0 Then
-        zusatz = 1
-    End If
-    no_q = Worksheets("Gen_output").Cells(17, 2).Value - zusatz
+    no_q = Worksheets("Gen_output").Cells(17, 2).Value - 1
     val_q = 0
+    last_always = (Worksheets("Gen_output").Cells(20, 2).Value > 0)
     For i = 1 To quest_anz(0)           ' Voraussetzungen abklappern, dass Frage möglich ist
-        If (quest_wahr(i) + quest_falsch(i)) >= no_q Then
-            If Not ((zusatz = 0) And ((quest_wahr(i) = 0) Or (quest_falsch(i) = 0))) Then
-                If (((quest_wahr(i) + 1) >= no_q) Or ((quest_falsch(i) + 1) >= no_q)) Then
-                    If Not (Worksheets("Gen_output").Cells(21, 2).Value And ((quest_wahr(i) = 0) Or (quest_falsch(i) + 1 < no_q))) Then
+        If (stat_wahr(i) + stat_falsch(i)) >= no_q Then
+            If Not (Not (last_always) And ((stat_wahr(i) = 0) Or (stat_falsch(i) = 0))) Then
+                If (((stat_wahr(i) + q_add) >= no_q) Or ((stat_falsch(i) + q_add) >= no_q)) Then
+                    If Not (Worksheets("Gen_output").Cells(21, 2).Value And ((stat_wahr(i) = 0) Or (stat_falsch(i) + q_add < no_q))) Then
                         val_q = val_q + 1
                         valid_questions(val_q) = i
                     End If
@@ -252,9 +269,18 @@ Dim zusatz As Integer
         If Worksheets("Gen_output").Cells(21, 2).Value Then
             gez_wahr(valid_questions(i)) = no_clz
         Else
-            gez_wahr(valid_questions(i)) = Round(no_clz * (quest_falsch(valid_questions(i)) / (quest_wahr(valid_questions(i)) + quest_falsch(valid_questions(i)))), 0)
+            gez_wahr(valid_questions(i)) = Round(no_clz * (stat_falsch(valid_questions(i)) / (stat_wahr(valid_questions(i)) + stat_falsch(valid_questions(i)))), 0)
             gez_falsch(valid_questions(i)) = no_clz - gez_wahr(valid_questions(i))
         End If
+        If last_always And (stat_wahr(valid_questions(i)) < (no_q - 1)) Then
+            gez_falsch(valid_questions(i)) = no_clz
+            gez_wahr(valid_questions(i)) = 0
+        End If
+        If last_always And (stat_falsch(valid_questions(i)) < (no_q - 1)) Then
+            gez_wahr(valid_questions(i)) = no_clz
+            gez_falsch(valid_questions(i)) = 0
+        End If
+        
     Next i
         
 End Sub
@@ -267,13 +293,13 @@ Dim Question_String As String
 Dim Single_Question As String
 Dim max_substitute As Integer
 Dim substitute As Integer
-Dim gez_wahr, gez_falsch, gezogen0, quest_anz, quest_wahr, quest_falsch, valid_quest, gezogen As Variant
+Dim gez_wahr, gez_falsch, gezogen0, quest_anz, quest_wahr, quest_falsch, valid_quest, gezogen, pos_quest As Variant
 Dim i As Integer
 Dim n As Integer
 Dim No_Bonus_comment As Boolean
 
     Randomize
-    Call init(2, gez_wahr, gez_falsch, gezogen, gezogen0, quest_anz, quest_wahr, quest_falsch, valid_quest)
+    Call init(2, gez_wahr, gez_falsch, gezogen, gezogen0, quest_wahr, quest_falsch, pos_quest, valid_quest)
     If valid_quest(0) = 0 Then
         MsgBox ("No valid questions can be generated. Please check number of positive and negative responses and your requested number of statemtens per question.")
         Exit Sub
@@ -285,15 +311,24 @@ Dim No_Bonus_comment As Boolean
     Text_File = FreeFile
     Open Filepath For Output As Text_File
     Call Print_Replace(Text_File, max_substitute, vbLf + "<quiz>" + vbLf)
-    For i = 1 To valid_quest(0)
-        substitute = Int(Rnd() * (max_substitute)) + 1
-        For n = 1 To quest_anz(0)               ' schleife passt, in der schleife muss noch alles geändert werden.
-'            Call select_questions(gezogen, gezogen0, gez_prozent)
-'            Single_Question = Code_Generieren(gezogen, gez_prozent)
-'            Question_String = XML_Header(i) + Single_Question + XML_End(i)
-'            Call Print_Replace(Text_File, substitute, Question_String)
-        Next n
-    Next i
+    For n = 1 To Worksheets("Gen_output").Cells(16, 2).Value
+        Question_String = XML_Header(n)
+        If Worksheets("questions").Cells(3, 3).Value <> "" Then
+            Question_String = Question_String + Worksheets("questions").Cells(3, 3).Value + "</p>" + vbLf
+        End If
+        
+        For i = 1 To valid_quest(0)
+            substitute = Int(Rnd() * (max_substitute)) + 1
+            Call select_questions(gezogen, gezogen0, gez_wahr, gez_falsch, pos_quest, valid_quest(i))
+            Single_Question = Code_Generieren(gezogen, pos_quest(valid_quest(i)))
+            Question_String = Question_String + Single_Question
+        Next i
+        Question_String = Question_String + XML_End(n)
+        Call Print_Replace(Text_File, substitute, Question_String)
+        
+        Worksheets("questions").Range("A6:A500").ClearContents
+
+    Next n
     Call Print_Replace(Text_File, substitute, vbLf + "</quiz>")
     Close Text_File
 End Sub
